@@ -1,0 +1,4 @@
+node_modules
+dist
+.sps-cli
+.env

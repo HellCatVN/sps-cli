@@ -1,0 +1,9 @@
+src/
+.env
+.env.example
+.env.local
+*.log
+node_modules/
+.sps-cli/
+dist/*.map
+tsconfig.json
