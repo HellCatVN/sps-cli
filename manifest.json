@@ -1,0 +1,17 @@
+{
+  "name": "sps-cli",
+  "version": "1.0.0",
+  "sync": {
+    "include": [
+      "src/**/*",
+      "package.json",
+      "tsconfig.json",
+      ".github/**/*"
+    ],
+    "exclude": [
+      "node_modules/**/*",
+      "dist/**/*",
+      "package-lock.json"
+    ]
+  }
+}
