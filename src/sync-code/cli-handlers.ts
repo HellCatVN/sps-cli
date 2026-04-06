@@ -142,4 +142,37 @@ export function registerCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  // sps-cli self-sync commands
+  program
+    .command('update')
+    .description('Pull remote sps-cli code from HellCatVN/sps-cli')
+    .option('-l, --local <path>', 'Local sps-cli path', 'sps-cli')
+    .action(async (options) => {
+      try {
+        const localPath = path.resolve(options.local);
+        const { update } = await import('./sync');
+        await update(localPath);
+      } catch (error) {
+        console.error(chalk.red(`✗ Update failed: ${error}`));
+        process.exit(1);
+      }
+    });
+
+  program
+    .command('dev-push')
+    .description('Push local sps-cli changes to HellCatVN/sps-cli')
+    .option('-l, --local <path>', 'Local sps-cli path', '.')
+    .option('-m, --message <msg>', 'Commit/PR message')
+    .action(async (options) => {
+      try {
+        const localPath = path.resolve(options.local);
+        const { devPush } = await import('./sync');
+        const prUrl = await devPush(localPath, options.message);
+        console.log(chalk.green(`✓ Created PR: ${prUrl}`));
+      } catch (error) {
+        console.error(chalk.red(`✗ Dev-push failed: ${error}`));
+        process.exit(1);
+      }
+    });
 }

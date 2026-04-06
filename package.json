@@ -1,7 +1,10 @@
 {
-  "name": "sps-cli",
+  "name": "@hellcatvn/sps-cli",
   "version": "0.0.1",
   "description": "VCS-agnostic sync CLI with manifest-driven sync",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "main": "dist/cli.js",
   "bin": {
     "sps": "./dist/cli.js",

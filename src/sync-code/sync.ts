@@ -218,6 +218,136 @@ export async function push(
   return prUrl;
 }
 
+const SPS_CLI_REPO = 'HellCatVN/sps-cli';
+
+export async function devPush(localPath: string, message?: string): Promise<string> {
+  const pushDir = path.join('.sps-cli', 'tmp', 'dev-push', SPS_CLI_REPO.replace(/[\/\\]/g, '_'));
+  const remoteUrl = `https://github.com/${SPS_CLI_REPO}.git`;
+
+  // 1. Ensure push dir is fresh clone
+  if (fs.existsSync(pushDir)) {
+    fs.rmSync(pushDir, { recursive: true, force: true });
+  }
+
+  gitClone(remoteUrl, pushDir);
+
+  // 2. Get manifest and diff from local sps-cli
+  const manifest = loadManifest(localPath);
+  const included = await getIncludedFiles(localPath, manifest);
+
+  if (included.length === 0) {
+    throw new Error('No changes to push');
+  }
+
+  // 3. Show push preview
+  console.log(chalk.cyan('─'.repeat(60)));
+  console.log(chalk.cyan(' DEV-PUSH PREVIEW '));
+  console.log(chalk.cyan('─'.repeat(60)));
+  console.log(chalk.green(`Files to push: ${included.length}`));
+  console.log(chalk.cyan('─'.repeat(60)));
+  const col1Width = 65;
+  console.log(chalk.gray('  File' + ' '.repeat(col1Width - 4) + '|    +    |    -'));
+  console.log(chalk.gray('  ' + '-'.repeat(col1Width) + '|--------|--------'));
+  for (const f of included) {
+    console.log(`  ${chalk.yellow(f.padEnd(col1Width))} | ${chalk.green('  +1  ')} | ${chalk.gray('  -0  ')}`);
+  }
+  console.log(chalk.cyan('─'.repeat(60)));
+
+  // 4. Confirm before push
+  const proceed = await confirm('Proceed with dev-push?');
+  if (!proceed) {
+    console.log(chalk.yellow('Dev-push cancelled.'));
+    process.exit(0);
+  }
+
+  // 5. Create branch and copy files
+  const branchName = `sps-cli-dev-push-${Date.now()}`;
+  gitCheckoutNewBranch(branchName, pushDir);
+
+  for (const file of included) {
+    const srcPath = path.join(localPath, file);
+    const destPath = path.join(pushDir, file);
+
+    if (fs.existsSync(srcPath) && fs.statSync(srcPath).isFile()) {
+      const destDir = path.dirname(destPath);
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+
+  // 6. Stage, commit, and push
+  gitAdd(included, pushDir);
+  const commitMessage = message || `sps-cli: dev-push\n\nFiles: ${included.join(', ')}`;
+  gitCommit(commitMessage, pushDir);
+  gitPush(branchName, pushDir);
+
+  // 7. Create PR
+  const prUrl = await createPR(
+    SPS_CLI_REPO,
+    `sps-cli: ${commitMessage.split('\n')[0]}`,
+    `Dev-push via sps-cli\n\nFiles changed: ${included.length}\n\n${included.map(f => `- ${f}`).join('\n')}`,
+    branchName
+  );
+
+  return prUrl;
+}
+
+export async function update(localPath: string): Promise<void> {
+  const pullDir = path.join('.sps-cli', 'tmp', 'update', SPS_CLI_REPO.replace(/[\/\\]/g, '_'));
+  const remoteUrl = `https://github.com/${SPS_CLI_REPO}.git`;
+
+  // 1. Clone or pull remote sps-cli
+  cloneOrPull(remoteUrl, pullDir);
+
+  // 2. Get manifest and files from remote
+  const manifest = loadManifest(pullDir);
+  const included = await getIncludedFiles(pullDir, manifest);
+
+  if (included.length === 0) {
+    console.log(chalk.green('✓ Already up to date — no changes to pull'));
+    return;
+  }
+
+  // 3. Show update preview
+  console.log(chalk.cyan('─'.repeat(60)));
+  console.log(chalk.cyan(' UPDATE PREVIEW '));
+  console.log(chalk.cyan('─'.repeat(60)));
+  console.log(chalk.red(`Files to overwrite: ${included.length}`));
+  console.log(chalk.cyan('─'.repeat(60)));
+  const col1Width = 65;
+  console.log(chalk.gray('  File' + ' '.repeat(col1Width - 4) + '|    +    |    -'));
+  console.log(chalk.gray('  ' + '-'.repeat(col1Width) + '|--------|--------'));
+  for (const f of included) {
+    console.log(`  ${chalk.yellow(f.padEnd(col1Width))} | ${chalk.green('  +1  ')} | ${chalk.gray('  -0  ')}`);
+  }
+  console.log(chalk.cyan('─'.repeat(60)));
+
+  // 4. Confirm before overwrite
+  const proceed = await confirm('Proceed with update?');
+  if (!proceed) {
+    console.log(chalk.yellow('Update cancelled.'));
+    return;
+  }
+
+  // 5. Copy files from pullDir to localPath
+  for (const file of included) {
+    const srcPath = path.join(pullDir, file);
+    const destPath = path.join(localPath, file);
+
+    if (fs.existsSync(srcPath)) {
+      const destDir = path.dirname(destPath);
+      if (!fs.existsSync(destDir)) {
+        fs.mkdirSync(destDir, { recursive: true });
+      }
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+
+  console.log(chalk.green(`✓ Updated sps-cli at ${localPath}`));
+}
+
 export async function sync(repo: string, localPath: string): Promise<void> {
   await pull(repo, localPath);
   await push(repo, localPath);
